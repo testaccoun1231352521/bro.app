@@ -1,0 +1,28 @@
+{
+  "id": "bro-hub",
+  "name": "Bro Hub",
+  "channels": {
+    "text": [
+      {
+        "id": "general",
+        "name": "general",
+        "messages": [
+          {
+            "id": 1784734178354,
+            "author": "Kara44",
+            "text": "hi",
+            "createdAt": "2026-07-22T15:29:38.354Z"
+          }
+        ]
+      }
+    ],
+    "voice": [
+      {
+        "id": "voice",
+        "name": "Voice",
+        "users": []
+      }
+    ]
+  },
+  "members": []
+}
