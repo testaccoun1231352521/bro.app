@@ -8,11 +8,11 @@ const workspaceName = document.getElementById('workspaceName');
 const channelList = document.getElementById('channelList');
 const channelTitle = document.getElementById('channelTitle');
 const channelContent = document.getElementById('channelContent');
-const messageForm = document.getElementById('messageForm');
-const messageInput = document.getElementById('messageInput');
+const messageForm = document.getElementById('messageForm') || document.getElementById('chat-form');
+const messageInput = document.getElementById('messageInput') || document.getElementById('chat-input');
 const voiceUsersList = document.getElementById('voiceUsersList');
 const voiceStatus = document.getElementById('voiceStatus');
-const voiceJoinButton = document.getElementById('voiceJoinButton');
+const voiceJoinButton = document.getElementById('voiceJoinButton') || document.getElementById('join-voice-btn');
 const voiceActionButton = document.getElementById('voiceActionButton');
 const voiceLeaveButton = document.getElementById('voiceLeaveButton');
 const voicePanel = document.getElementById('voicePanel');
@@ -48,7 +48,14 @@ messageForm.addEventListener('submit', (event) => {
   const text = messageInput.value.trim();
   if (!text) return;
   if (socket?.connected && currentChannelId === 'general') {
-    socket.emit('send-message', { serverId: currentServerId, channelId: currentChannelId, text });
+    const payload = {
+      serverId: currentServerId,
+      channelId: currentChannelId,
+      text,
+      author: myUsername
+    };
+    socket.emit('send-message', payload);
+    socket.emit('sendMessage', payload);
     messageInput.value = '';
   }
 });
@@ -265,6 +272,36 @@ function leaveVoiceChannel() {
   voiceJoined = false;
   stopVoiceBroadcast();
   updateVoiceControls();
+}
+
+function joinVoiceChannel() {
+  if (!socket?.connected) {
+    pendingVoiceJoin = true;
+    connectSocket();
+    return;
+  }
+
+  if (voiceJoined) {
+    updateVoiceControls();
+    return;
+  }
+
+  currentChannelId = 'voice';
+  voiceJoined = true;
+  updateVoiceControls();
+  const payload = { serverId: currentServerId };
+  socket.emit('join-voice', payload);
+  socket.emit('joinVoice', payload);
+  ensureLocalStream().then((stream) => {
+    if (stream) {
+      startVoiceBroadcast(stream);
+      voiceStatus.textContent = muted ? 'Voice connected (muted)' : 'Voice connected';
+      voiceActionButton.classList.remove('hidden');
+      voiceLeaveButton.classList.remove('hidden');
+    } else {
+      voiceStatus.textContent = 'Joined voice (mic unavailable)';
+    }
+  });
 }
 
 let currentWorkspace;
