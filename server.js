@@ -218,11 +218,11 @@ httpServer.listen(PORT, () => {
   console.log(`Bro app listening on http://localhost:${PORT}`);
 });
 
-if (httpsServer) {
-  const HTTPS_PORT = Number(process.env.HTTPS_PORT || 5443);
-  httpsServer.listen(HTTPS_PORT, () => {
-    console.log(`Bro app listening on https://localhost:${HTTPS_PORT}`);
-  });
+//if (httpsServer) {
+  //const HTTPS_PORT = Number(process.env.HTTPS_PORT || 5443);
+  //httpsServer.listen(HTTPS_PORT, () => {
+    //console.log(`Bro app listening on https://localhost:${HTTPS_PORT}`);
+  //});
 }
 
 module.exports = { app, httpServer, httpsServer, workspace };
