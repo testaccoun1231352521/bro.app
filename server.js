@@ -73,14 +73,19 @@ function loadWorkspace() {
   }
 }
 
-const workspace = loadWorkspace();
+const workspace = loadWorkspace() || { servers: [] };
+if (!workspace.servers) {
+    workspace.servers = [];
+}
 
 function normalizeServerId(name) {
   return String(name || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
 function getServer(serverId) {
-  return workspace.servers.find((server) => server.id === normalizeServerId(serverId));
+  function getServer(serverId) {
+    return workspace?.servers?.find((server) => server.id === normalizeServerId(serverId));
+}
 }
 
 function createServer(name) {
