@@ -19,9 +19,14 @@
         </div>
         <form class="hero-actions stack">
           <input id="usernameInput" type="text" placeholder="Enter your username" required />
-          <button type="submit">Enter</button>
-          <p class="helper-text">You will enter the default server right away.</p>
+          <input id="serverInput" type="text" placeholder="Server name (create or join)" required />
+          <button type="submit">Enter server</button>
+          <p class="helper-text">Create or join your own server by name.</p>
         </form>
+        <div id="serverList" class="server-list hidden">
+          <p class="helper-text">Existing servers</p>
+          <div id="serverButtons" class="server-buttons"></div>
+        </div>
       </section>
 
       <section id="appView" class="hidden">
@@ -38,22 +43,26 @@
         <section class="card server-card">
           <div class="sidebar">
             <h3>Channels</h3>
-            <div class="channel-pill"># <span id="textChannelName">general</span></div>
-            <div class="channel-pill">🔊 <span>Voice</span></div>
+            <div id="channelList" class="channel-list">
+              <button type="button" class="channel-item active" data-channel="general"># general</button>
+              <button type="button" class="channel-item" data-channel="rules">📜 rules</button>
+              <button type="button" class="channel-item" data-channel="voice">🔊 voice</button>
+            </div>
           </div>
           <div class="main-panel">
             <div class="stack">
-              <h3>Text channel</h3>
+              <h3 id="channelTitle">#general</h3>
+              <div id="channelContent" class="channel-content"></div>
               <form id="messageForm" class="stack">
                 <input id="messageInput" type="text" placeholder="Message the channel" required />
                 <button type="submit">Send</button>
               </form>
-              <div id="messagesList" class="messages"></div>
             </div>
             <div class="voice-panel">
               <h3>Voice channel</h3>
-              <button id="voiceButton" type="button">Join voice</button>
               <p id="voiceStatus">Voice channel idle</p>
+              <button id="voiceActionButton" type="button" class="hidden">Mute microphone</button>
+              <button id="voiceLeaveButton" type="button" class="hidden">Leave voice</button>
               <strong>In voice</strong>
               <ul id="voiceUsersList"></ul>
               <strong>Online</strong>

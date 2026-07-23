@@ -27,13 +27,29 @@ fs.mkdirSync(dataDir, { recursive: true });
 
 function createDefaultWorkspace() {
   return {
-    id: 'bro-hub',
-    name: 'Bro Hub',
-    channels: {
-      text: [{ id: 'general', name: 'general', messages: [] }],
-      voice: [{ id: 'voice', name: 'Voice', users: [] }]
-    },
-    members: []
+    servers: [
+      {
+        id: 'bro-hub',
+        name: 'Bro Hub',
+        channels: {
+          text: [
+            { id: 'general', name: 'general', messages: [] },
+            {
+              id: 'rules',
+              name: 'rules',
+              messages: [
+                { id: Date.now() + 1, author: 'System', text: '1. Keep it respectful.', createdAt: new Date().toISOString() },
+                { id: Date.now() + 2, author: 'System', text: '2. No harassment or hate.', createdAt: new Date().toISOString() },
+                { id: Date.now() + 3, author: 'System', text: '3. Do not share other people’s personal information.', createdAt: new Date().toISOString() },
+                { id: Date.now() + 4, author: 'System', text: '4. Keep the chat bro-friendly.', createdAt: new Date().toISOString() }
+              ]
+            }
+          ]
+        },
+        voice: [{ id: 'voice', name: 'Voice', users: [] }],
+        members: []
+      }
+    ]
   };
 }
 
@@ -59,27 +75,65 @@ function loadWorkspace() {
 
 const workspace = loadWorkspace();
 
-function getTextChannel() {
-  return workspace.channels.text[0];
+function normalizeServerId(name) {
+  return String(name || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 }
 
-function getVoiceChannel() {
-  return workspace.channels.voice[0];
+function getServer(serverId) {
+  return workspace.servers.find((server) => server.id === normalizeServerId(serverId));
 }
 
-function addMember(socket, username) {
-  const existing = workspace.members.find((member) => member.id === socket.id);
+function createServer(name) {
+  const id = normalizeServerId(name || `server-${Date.now()}`);
+  const server = {
+    id,
+    name: name.trim() || `Server ${id}`,
+    channels: {
+      text: [
+        { id: 'general', name: 'general', messages: [] },
+        {
+          id: 'rules',
+          name: 'rules',
+          messages: [
+            { id: Date.now() + 1, author: 'System', text: '1. Keep it respectful.', createdAt: new Date().toISOString() },
+            { id: Date.now() + 2, author: 'System', text: '2. No harassment or hate.', createdAt: new Date().toISOString() },
+            { id: Date.now() + 3, author: 'System', text: '3. Do not share other people’s personal information.', createdAt: new Date().toISOString() },
+            { id: Date.now() + 4, author: 'System', text: '4. Keep the chat bro-friendly.', createdAt: new Date().toISOString() }
+          ]
+        }
+      ]
+    },
+    voice: [{ id: 'voice', name: 'Voice', users: [] }],
+    members: []
+  };
+
+  workspace.servers.push(server);
+  saveWorkspace(workspace);
+  return server;
+}
+
+function getTextChannel(server, channelId = 'general') {
+  return server.channels.text.find((channel) => channel.id === channelId) || server.channels.text[0];
+}
+
+function getVoiceChannel(server) {
+  return server.voice[0];
+}
+
+function addMemberToServer(server, socket, username) {
+  const existing = server.members.find((member) => member.id === socket.id);
   if (existing) {
     existing.name = username;
     return;
   }
 
-  workspace.members.push({ id: socket.id, name: username });
+  server.members.push({ id: socket.id, name: username });
 }
 
-function removeMember(socketId) {
-  workspace.members = workspace.members.filter((member) => member.id !== socketId);
-  const voiceChannel = getVoiceChannel();
+function removeMemberFromServer(server, socketId) {
+  if (!server) return;
+  server.members = server.members.filter((member) => member.id !== socketId);
+  const voiceChannel = getVoiceChannel(server);
   voiceChannel.users = voiceChannel.users.filter((user) => user.id !== socketId);
 }
 
@@ -87,13 +141,15 @@ function broadcastWorkspace() {
   io.emit('workspace:update', { workspace });
 }
 
-function broadcastVoiceState() {
-  const voiceChannel = getVoiceChannel();
-  io.emit('voice:update', { users: voiceChannel.users });
+function broadcastVoiceState(server) {
+  const voiceChannel = getVoiceChannel(server);
+  io.emit('voice:update', { serverId: server.id, users: voiceChannel.users });
 }
 
 function broadcastVoiceFrame(senderSocket, payload) {
-  const voiceChannel = getVoiceChannel();
+  const server = getServer(payload.serverId);
+  if (!server) return;
+  const voiceChannel = getVoiceChannel(server);
   voiceChannel.users.forEach((user) => {
     if (user.id !== senderSocket.id) {
       senderSocket.to(user.id).emit('voice:frame', { from: senderSocket.id, ...payload });
@@ -118,7 +174,14 @@ app.get('/api/workspace', (req, res) => {
 });
 
 app.post('/api/messages', (req, res) => {
-  const channel = getTextChannel();
+  const serverId = req.body.serverId;
+  const channelId = req.body.channelId || 'general';
+  const server = getServer(serverId);
+  if (!server) {
+    return res.status(404).json({ ok: false, message: 'Server not found' });
+  }
+
+  const channel = getTextChannel(server, channelId);
   const text = (req.body.text || '').trim();
   if (!text) {
     return res.status(400).json({ ok: false, message: 'Message cannot be empty' });
@@ -143,17 +206,27 @@ app.post('/api/messages', (req, res) => {
 io.on('connection', (socket) => {
   socket.data.username = 'Bro';
 
-  socket.on('join-workspace', ({ username }) => {
+  socket.on('join-workspace', ({ username, serverName }) => {
     socket.data.username = (username || 'Bro').trim() || 'Bro';
-    addMember(socket, socket.data.username);
+    const serverId = normalizeServerId(serverName || 'bro-hub');
+    let server = getServer(serverId);
+    if (!server) {
+      server = createServer(serverName || 'Bro Hub');
+    }
+
+    socket.data.serverId = server.id;
+    addMemberToServer(server, socket, socket.data.username);
     saveWorkspace(workspace);
 
-    socket.emit('workspace:ready', { workspace, myId: socket.id });
+    socket.emit('workspace:ready', { workspace, myId: socket.id, server, currentChannel: 'general' });
     broadcastWorkspace();
   });
 
-  socket.on('send-message', ({ text }) => {
-    const channel = getTextChannel();
+  socket.on('send-message', ({ serverId, channelId, text }) => {
+    const server = getServer(serverId);
+    if (!server) return;
+
+    const channel = getTextChannel(server, channelId);
     const clean = (text || '').trim();
     if (!clean) return;
 
@@ -172,8 +245,11 @@ io.on('connection', (socket) => {
     broadcastWorkspace();
   });
 
-  socket.on('join-voice', () => {
-    const voiceChannel = getVoiceChannel();
+  socket.on('join-voice', ({ serverId }) => {
+    const server = getServer(serverId);
+    if (!server) return;
+
+    const voiceChannel = getVoiceChannel(server);
     const voiceUser = { id: socket.id, name: socket.data.username || 'Bro' };
     if (!voiceChannel.users.some((user) => user.id === socket.id)) {
       voiceChannel.users.push(voiceUser);
@@ -183,29 +259,38 @@ io.on('connection', (socket) => {
     broadcastVoiceState();
 
     const existingUsers = voiceChannel.users.filter((user) => user.id !== socket.id);
-    socket.emit('voice:joined', { user: voiceUser, users: existingUsers });
-    socket.broadcast.emit('voice:user-joined', { user: voiceUser });
+    socket.emit('voice:joined', { user: voiceUser, users: existingUsers, serverId });
+    socket.broadcast.emit('voice:user-joined', { user: voiceUser, serverId });
   });
 
-  socket.on('leave-voice', () => {
-    const voiceChannel = getVoiceChannel();
+  socket.on('leave-voice', ({ serverId }) => {
+    const server = getServer(serverId);
+    if (!server) return;
+
+    const voiceChannel = getVoiceChannel(server);
     voiceChannel.users = voiceChannel.users.filter((user) => user.id !== socket.id);
     saveWorkspace(workspace);
     broadcastVoiceState();
-    socket.emit('voice:left');
-    socket.broadcast.emit('voice:user-left', { id: socket.id });
+    socket.emit('voice:left', { serverId });
+    socket.broadcast.emit('voice:user-left', { id: socket.id, serverId });
   });
 
-  socket.on('voice:frame', (payload) => {
-    if (!payload?.data) return;
-    broadcastVoiceFrame(socket, payload);
+  socket.on('voice:frame', ({ serverId, data, mimeType }) => {
+    if (!data) return;
+    const server = getServer(serverId);
+    if (!server) return;
+    broadcastVoiceFrame(socket, { serverId, data, mimeType });
   });
 
   socket.on('disconnect', () => {
-    removeMember(socket.id);
-    saveWorkspace(workspace);
-    broadcastWorkspace();
-    broadcastVoiceState();
+    const serverId = socket.data.serverId;
+    const server = getServer(serverId);
+    if (server) {
+      removeMemberFromServer(server, socket.id);
+      saveWorkspace(workspace);
+      broadcastWorkspace();
+      broadcastVoiceState(server);
+    }
   });
 });
 

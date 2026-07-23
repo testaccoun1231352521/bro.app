@@ -41,12 +41,17 @@ button {
 .helper-text { color: #9fb7df; font-size: 0.9rem; margin-top: 6px; }
 .server-card { display: grid; grid-template-columns: 220px 1fr; gap: 16px; }
 .sidebar, .voice-panel { background: rgba(255,255,255,0.04); border-radius: 16px; padding: 12px; }
-.channel-pill { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.06); margin-top: 8px; }
-.main-panel { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
-.stack { display: flex; flex-direction: column; gap: 8px; }
-.messages { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.server-list { margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; }
+.server-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.server-buttons button { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color: #eef4ff; cursor: pointer; }
+.channel-list { display: grid; gap: 10px; margin-top: 12px; }
+.channel-item { width: 100%; text-align: left; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; background: rgba(255,255,255,0.03); color: inherit; cursor: pointer; }
+.channel-item:hover { background: rgba(255,255,255,0.08); }
+.channel-item.active { background: rgba(35, 189, 244, 0.16); border-color: #23bdf4; }
+.channel-content { min-height: 320px; margin-top: 12px; }
 .message-card { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 12px; }
-small { color: #9fb7df; }
+.message-card strong { display: block; margin-bottom: 4px; }
+.voice-panel button { margin-top: 10px; }
 @media (max-width: 780px) {
   .hero-card, .server-card, .main-panel { display: grid; grid-template-columns: 1fr; }
 }
