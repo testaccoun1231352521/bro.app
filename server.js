@@ -250,6 +250,29 @@ io.on('connection', (socket) => {
     broadcastWorkspace();
   });
 
+  socket.on('sendMessage', ({ serverId, channelId, text }) => {
+    const server = getServer(serverId);
+    if (!server) return;
+
+    const channel = getTextChannel(server, channelId);
+    const clean = (text || '').trim();
+    if (!clean) return;
+
+    channel.messages.push({
+      id: Date.now(),
+      author: socket.data.username || 'Bro',
+      text: clean,
+      createdAt: new Date().toISOString()
+    });
+
+    if (channel.messages.length > 200) {
+      channel.messages.shift();
+    }
+
+    saveWorkspace(workspace);
+    broadcastWorkspace();
+  });
+
   socket.on('join-voice', ({ serverId }) => {
     const server = getServer(serverId);
     if (!server) return;
@@ -261,10 +284,26 @@ io.on('connection', (socket) => {
     }
 
     saveWorkspace(workspace);
-    broadcastVoiceState();
+    broadcastVoiceState(server);
 
-    const existingUsers = voiceChannel.users.filter((user) => user.id !== socket.id);
-    socket.emit('voice:joined', { user: voiceUser, users: existingUsers, serverId });
+    socket.emit('voice:joined', { users: voiceChannel.users, serverId });
+    socket.broadcast.emit('voice:user-joined', { user: voiceUser, serverId });
+  });
+
+  socket.on('joinVoice', ({ serverId }) => {
+    const server = getServer(serverId);
+    if (!server) return;
+
+    const voiceChannel = getVoiceChannel(server);
+    const voiceUser = { id: socket.id, name: socket.data.username || 'Bro' };
+    if (!voiceChannel.users.some((user) => user.id === socket.id)) {
+      voiceChannel.users.push(voiceUser);
+    }
+
+    saveWorkspace(workspace);
+    broadcastVoiceState(server);
+
+    socket.emit('voice:joined', { users: voiceChannel.users, serverId });
     socket.broadcast.emit('voice:user-joined', { user: voiceUser, serverId });
   });
 
@@ -275,7 +314,7 @@ io.on('connection', (socket) => {
     const voiceChannel = getVoiceChannel(server);
     voiceChannel.users = voiceChannel.users.filter((user) => user.id !== socket.id);
     saveWorkspace(workspace);
-    broadcastVoiceState();
+    broadcastVoiceState(server);
     socket.emit('voice:left', { serverId });
     socket.broadcast.emit('voice:user-left', { id: socket.id, serverId });
   });

@@ -120,13 +120,10 @@ function connectSocket() {
 
   socket.on('voice:joined', ({ users, serverId }) => {
     if (serverId !== currentServerId) return;
+    voiceJoined = true;
     renderVoiceUsers(users);
-    if (voiceJoined) {
-      voiceStatus.textContent = localStream ? 'Voice connected' : 'Joined voice (mic unavailable)';
-      voiceActionButton.classList.remove('hidden');
-      voiceLeaveButton.classList.remove('hidden');
-      voiceActionButton.textContent = muted ? 'Unmute microphone' : 'Mute microphone';
-    }
+    updateVoiceControls();
+    voiceStatus.textContent = localStream ? (muted ? 'Voice connected (muted)' : 'Voice connected') : 'Joined voice (mic unavailable)';
   });
 
   socket.on('voice:user-joined', ({ user, serverId }) => {
@@ -287,20 +284,18 @@ function joinVoiceChannel() {
   }
 
   currentChannelId = 'voice';
-  voiceJoined = true;
   updateVoiceControls();
   const payload = { serverId: currentServerId };
   socket.emit('join-voice', payload);
   socket.emit('joinVoice', payload);
+  voiceStatus.textContent = 'Joining voice...';
   ensureLocalStream().then((stream) => {
     if (stream) {
+      localStream = stream;
       startVoiceBroadcast(stream);
-      voiceStatus.textContent = muted ? 'Voice connected (muted)' : 'Voice connected';
-      voiceActionButton.classList.remove('hidden');
-      voiceLeaveButton.classList.remove('hidden');
-    } else {
-      voiceStatus.textContent = 'Joined voice (mic unavailable)';
     }
+  }).catch(() => {
+    // Mic permission may be denied, still attempt to join voice channel.
   });
 }
 
