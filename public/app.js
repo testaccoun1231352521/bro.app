@@ -47,17 +47,17 @@ messageForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const text = messageInput.value.trim();
   if (!text) return;
-  if (socket?.connected && currentChannelId === 'general') {
-    const payload = {
-      serverId: currentServerId,
-      channelId: currentChannelId,
-      text,
-      author: myUsername
-    };
-    socket.emit('send-message', payload);
-    socket.emit('sendMessage', payload);
-    messageInput.value = '';
-  }
+  if (!socket?.connected || currentChannelId === 'voice' || currentChannelId === 'rules') return;
+
+  const payload = {
+    serverId: currentServerId,
+    channelId: currentChannelId,
+    text,
+    author: myUsername
+  };
+  socket.emit('send-message', payload);
+  socket.emit('sendMessage', payload);
+  messageInput.value = '';
 });
 
 voiceJoinButton.addEventListener('click', () => {
@@ -121,7 +121,9 @@ function connectSocket() {
   socket.on('voice:joined', ({ users, serverId }) => {
     if (serverId !== currentServerId) return;
     voiceJoined = true;
-    renderVoiceUsers(users);
+    const currentUser = { id: socket.id, name: myUsername || 'Bro' };
+    const voiceUsers = users.some((user) => user.id === socket.id) ? users : [currentUser, ...users];
+    renderVoiceUsers(voiceUsers);
     updateVoiceControls();
     voiceStatus.textContent = localStream ? (muted ? 'Voice connected (muted)' : 'Voice connected') : 'Joined voice (mic unavailable)';
   });
