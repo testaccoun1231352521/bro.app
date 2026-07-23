@@ -12,8 +12,10 @@ const messageForm = document.getElementById('messageForm');
 const messageInput = document.getElementById('messageInput');
 const voiceUsersList = document.getElementById('voiceUsersList');
 const voiceStatus = document.getElementById('voiceStatus');
+const voiceJoinButton = document.getElementById('voiceJoinButton');
 const voiceActionButton = document.getElementById('voiceActionButton');
 const voiceLeaveButton = document.getElementById('voiceLeaveButton');
+const voicePanel = document.getElementById('voicePanel');
 const membersList = document.getElementById('membersList');
 
 let socket;
@@ -51,6 +53,10 @@ messageForm.addEventListener('submit', (event) => {
   }
 });
 
+voiceJoinButton.addEventListener('click', () => {
+  joinVoiceChannel();
+});
+
 voiceActionButton.addEventListener('click', () => {
   if (!localStream) return;
   muted = !muted;
@@ -63,12 +69,7 @@ voiceActionButton.addEventListener('click', () => {
 
 voiceLeaveButton.addEventListener('click', () => {
   if (!socket?.connected) return;
-  socket.emit('leave-voice', { serverId: currentServerId });
-  voiceJoined = false;
-  voiceStatus.textContent = 'Voice channel idle';
-  stopVoiceBroadcast();
-  voiceActionButton.classList.add('hidden');
-  voiceLeaveButton.classList.add('hidden');
+  leaveVoiceChannel();
 });
 
 function connectSocket() {
@@ -134,10 +135,8 @@ function connectSocket() {
   socket.on('voice:left', ({ serverId }) => {
     if (serverId !== currentServerId) return;
     voiceJoined = false;
-    voiceStatus.textContent = 'Voice channel idle';
     stopVoiceBroadcast();
-    voiceActionButton.classList.add('hidden');
-    voiceLeaveButton.classList.add('hidden');
+    updateVoiceControls();
   });
 
   socket.on('voice:frame', ({ from, data, mimeType, serverId }) => {
@@ -231,6 +230,43 @@ function playIncomingVoice(base64, mimeType) {
   });
 }
 
+function showVoicePanel(show) {
+  if (!voicePanel) return;
+  voicePanel.classList.toggle('hidden', !show);
+}
+
+function updateVoiceControls() {
+  if (currentChannelId !== 'voice') {
+    showVoicePanel(false);
+    voiceJoinButton?.classList?.add('hidden');
+    voiceActionButton?.classList?.add('hidden');
+    voiceLeaveButton?.classList?.add('hidden');
+    return;
+  }
+
+  showVoicePanel(true);
+  if (voiceJoined) {
+    voiceJoinButton.classList.add('hidden');
+    voiceActionButton.classList.remove('hidden');
+    voiceLeaveButton.classList.remove('hidden');
+    voiceStatus.textContent = muted ? 'Voice connected (muted)' : 'Voice connected';
+    voiceActionButton.textContent = muted ? 'Unmute microphone' : 'Mute microphone';
+  } else {
+    voiceJoinButton.classList.remove('hidden');
+    voiceActionButton.classList.add('hidden');
+    voiceLeaveButton.classList.add('hidden');
+    voiceStatus.textContent = 'Voice channel idle';
+  }
+}
+
+function leaveVoiceChannel() {
+  if (!socket?.connected) return;
+  socket.emit('leave-voice', { serverId: currentServerId });
+  voiceJoined = false;
+  stopVoiceBroadcast();
+  updateVoiceControls();
+}
+
 let currentWorkspace;
 
 function getServerFromWorkspace(workspace, serverId) {
@@ -247,10 +283,11 @@ function renderWorkspace(workspace, server) {
   workspaceName.textContent = server.name;
   showServerList(workspace.servers);
 
-  const channel = getTextChannel(server, currentChannelId);
-  currentChannelId = channel.id;
+  const isVoiceChannel = currentChannelId === 'voice';
+  const channel = isVoiceChannel ? { id: 'voice', name: 'voice', messages: [] } : getTextChannel(server, currentChannelId);
   channelTitle.textContent = `#${channel.name}`;
   updateChannelSelection();
+  updateVoiceControls();
 
   if (channel.id === 'rules') {
     channelContent.innerHTML = (channel.messages || []).map((message) => `
@@ -259,6 +296,9 @@ function renderWorkspace(workspace, server) {
         <p>${message.text}</p>
       </div>
     `).join('');
+    messageForm.classList.add('hidden');
+  } else if (channel.id === 'voice') {
+    channelContent.innerHTML = '<p>Click join to enter the voice channel.</p>';
     messageForm.classList.add('hidden');
   } else {
     channelContent.innerHTML = (channel.messages || []).map((message) => `
@@ -321,9 +361,6 @@ function setupChannelButtons() {
       if (!currentWorkspace) return;
       const server = getServerFromWorkspace(currentWorkspace, currentServerId);
       renderWorkspace(currentWorkspace, server);
-      if (currentChannelId === 'voice') {
-        joinVoiceChannel();
-      }
     });
   });
 }
